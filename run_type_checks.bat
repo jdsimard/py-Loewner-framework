@@ -1,0 +1,1 @@
+mypy loewner_framework

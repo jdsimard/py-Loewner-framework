@@ -1,0 +1,9 @@
+name: py-loewner-framework-env
+channels:
+  - defaults
+dependencies:
+  - matplotlib
+  - mypy
+  - numpy
+  - pytest
+  - scipy
