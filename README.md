@@ -497,9 +497,15 @@ interp.E, interp.A, interp.B, interp.C, interp.D
 interp.tf(complex(real=0.0, imag=1.0))
 ```
 
+## Generating Interpolants with the Interpolant Factory - Assigned Poles
 
+For a square Loewner matrix, interpolants with dimension $2 \rho$ of the form given in [J. D. Simard & A. Moreschini, "Enforcing Stability of Linear Interpolants in the Loewner Framework." IEEE Control Systems Letters 7 (2023): 3537-3542](https://doi.org/10.1109/LCSYS.2023.3336465) can be constructed having any desired set of poles (except for those in $\Lambda$ and $M$) while still satisfying the interpolation constraints. To build such an interpolant with any desired poles, we can do the following
+```
+desired_poles = np.arange(-6, 0, 1) * 1
 
-
+poleplaced_interp = interpolant_builder.double_order_pole_placed(desired_poles, D=None, label="Pole-Placed Interpolant")
+```
+The free parameters $P$, $Q$, $G$, $T$, $H$, and $F$ are used to achieve the given pole constraint, leaving $D$ the remaining free parameter for the interpolant of order $2 \rho$. The length of the desired_poles array must be $2 \rho$. Furthermore, the Loewner matrix should be nonsingular for compatibility with the SciPy.signal place_poles function, which does pole placement for ODE systems but not DAE systems. A more general numerical pole placement algorithm may be used in the future.
 
 
 
@@ -922,6 +928,10 @@ InterpolantFactory.parameterization(self,   D: numpy.ndarray | None = None, P: n
                                             Q: numpy.ndarray | None = None, G: numpy.ndarray | None = None,
                                             T: numpy.ndarray | None = None, H: numpy.ndarray | None = None,
                                             F: numpy.ndarray | None = None, label: str = "") -> linear_daes.LinearDAE
+```
+
+```
+InterpolantFactory.double_order_pole_placed(self,  desired_poles: _np.ndarray, D: _np.ndarray | None = None, label: str = "") -> _ld.LinearDAE
 ```
 
 ### Special Methods

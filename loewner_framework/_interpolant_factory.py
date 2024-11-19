@@ -1,4 +1,5 @@
 import numpy as _np
+import scipy.signal as _spsg
 
 from . import generalized_sylvester as _gs
 from . import linear_daes as _ld
@@ -324,6 +325,62 @@ class InterpolantFactory:
                 raise ValueError("Inconsistent shape.")
         else:
             raise ValueError("Inconsistent shape.")
+        
+    def double_order_pole_placed(self,  desired_poles: _np.ndarray, D: _np.ndarray | None = None, label: str = "") -> _ld.LinearDAE:
+        """Given a square and invertible Loewner matrix, construct an interpolant of the tangential data of twice the minimal order, but having prescribed poles.
+
+        Given desired interpolant free parameter D, and a desired set of 2*rho system poles, construct a LinearDAE that interpolates the data used to initialized the InterpolantFactory object. The provided free parameter shape should be consistent with the dictionary returned by the parameter_dimensions method, and therefore should return a tuple from the check_consistent_shapes method with the first entry being True. The Loewner matrix should be square and invertible.
+
+        Args:
+            D: a 2darray representing the D free parameter, or None if D will be zero.
+            desired_poles: a 1darray representing the 2*rho desired interpolant poles; desired_poles should not contain any eigenvalues in the RightTangentialData and LeftTangentialData matrices Lambda and M, respectively.
+            label: the label to be assigned to the returned linear_daes.LinearDAE object.
+
+        Returns:
+            A linear_daes.LinearDAE object constructed from the interpolation data used to initialize the InterpolantFactory object, along with the interpolant free parameter provided to this method. If an exception is not raised, the returned system will belong to the parameterization of all Loewner framework interpolants and will therefore be an interpolant of the right and left tangential data sets by construction. The system will have dimension 2*rho.
+
+        Raises:
+            ValueError: Inconsistent shape.
+            ValueError: Loewner matrix is singular.
+            ValueError: Inconsistent number of poles to place.
+        """
+        # first, check that the Loewner matrix is square and invertible
+        if not self.rho == self.nu:
+            raise ValueError("Inconsistent shape.")
+        if _np.linalg.det(self.Loewner) == 0:
+            raise ValueError("Loewner matrix is singular.")
+        
+        # check that D is the right shape, or None (in which case, set to 0 matrix of correct shape)
+        if D is None:
+            D = _np.zeros((self.p, self.m))
+        elif not D.shape == (self.p, self.m):
+            raise ValueError("Inconsistent shape.")
+        
+        # check that the number of poles is 2*rho
+        if not desired_poles.size == 2*self.rho:
+            raise ValueError("Inconsistent number of poles to place.")
+        poles = desired_poles if desired_poles.ndim == 1 else desired_poles.flatten()
+        
+        # try to calculate the required T and H parameters via pole placement
+        A1, A2, B, C = _np.linalg.inv(self.Loewner) @ self.shiftedLoewner, self.shiftedLoewner @ _np.linalg.inv(self.Loewner), _np.linalg.inv(self.Loewner) @ self.L, -self.R @ _np.linalg.inv(self.Loewner)
+        Hbar = _spsg.place_poles(A1, -B, poles[0:self.rho])
+        Tbar = _spsg.place_poles(A2.T, C.T, poles[self.rho:2*self.rho])
+        H = Hbar.gain_matrix + D @ self.R
+        T = -Tbar.gain_matrix.T - self.L @ D
+
+        # assign the remaining required free parameters for construction via the parameterization method
+        P = _np.zeros((self.rho, self.rho))
+        Q = _np.zeros((self.rho, self.rho))
+        G = self.Loewner
+        F = self.shiftedLoewner - self.L @ D @ self.R - T @ self.R + self.L @ H
+
+        # check shapes are consistent
+        consistent, total_dimension = self.check_consistent_shapes(D=D, P=P, Q=Q, G=G, T=T, H=H, F=F)
+        if not consistent or not total_dimension == 2*self.rho:
+            raise ValueError("Inconsistent shape.")
+        
+        # build the interpolant
+        return self.parameterization(D, P, Q, G, T, H, F, label)
 
     def __repr__(self) -> str:
         return f"InterpolantFactory\nisComplete = {self.isComplete}\n"
